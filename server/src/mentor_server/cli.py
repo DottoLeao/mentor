@@ -23,3 +23,13 @@ def index_main(argv: list[str] | None = None) -> None:
         for nome in nomes:
             n = index_source(conn, nome, embedder, WORKDIR)
             print(f"{nome}: {n} trechos", flush=True)
+
+
+def serve_main() -> None:
+    import os
+
+    import uvicorn
+
+    from mentor_server.app import create_http_app
+
+    uvicorn.run(create_http_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
