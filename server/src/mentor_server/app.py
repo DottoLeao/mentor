@@ -23,7 +23,10 @@ log = logging.getLogger("mentor_server")
 
 MAX_PERGUNTA = 2000
 STATEMENT_TIMEOUT_MS = 4000  # a resposta (ou o erro) precisa sair em até 5 s
-ATRIBUICAO_MDN = "Conteúdo da MDN Web Docs (Mozilla e colaboradores), licença CC-BY-SA 2.5."
+ATRIBUICAO_MDN = (
+    "Trechos da MDN Web Docs by Mozilla Contributors, licença CC-BY-SA 2.5 "
+    "(https://creativecommons.org/licenses/by-sa/2.5/). Cada trecho traz o link da página de origem."
+)
 ERRO_PERGUNTA = "A pergunta precisa ter entre 1 e 2000 caracteres."
 ERRO_FONTE = "Fonte desconhecida. Use uma destas: mdn, typescript, node."
 ERRO_K = "O número de trechos (k) precisa estar entre 1 e 10."

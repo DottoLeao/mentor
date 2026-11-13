@@ -45,3 +45,7 @@ def test_arquivo_sem_url_e_pulado(tmp_path):
     f = tmp_path / "sem.md"
     f.write_text("# sem permalink")
     assert SOURCES["typescript"].url_for(f) is None
+
+
+def test_licenca_do_typescript_confirmada():
+    assert SOURCES["typescript"].license == "CC-BY-4.0"

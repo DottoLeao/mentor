@@ -87,3 +87,10 @@ def test_embedder_de_consulta_tem_timeout_curto():
 
     s = Settings(embed_provider="ollama")
     assert make_embedder(s, timeout=s.query_timeout_s).timeout <= 4
+
+
+@pytest.mark.db
+async def test_atribuicao_mdn_no_formato_recomendado(client_fake):
+    r = await call(client_fake, "buscar_docs", {"pergunta": "Map.prototype.get"})
+    a = r.data["atribuicao"]
+    assert "Mozilla Contributors" in a and "https://creativecommons.org/licenses/by-sa/2.5/" in a

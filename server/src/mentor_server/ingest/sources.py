@@ -62,12 +62,11 @@ def _node_url(path: Path) -> str | None:
 
 SOURCES: dict[str, Source] = {
     "mdn": Source("mdn", "https://github.com/mdn/content", "files/en-us/web/javascript", "CC-BY-SA-2.5", _mdn_url),
-    # Licença do conteúdo do TypeScript-Website a confirmar (ticket MENTOR-5).
     "typescript": Source(
         "typescript",
         "https://github.com/microsoft/TypeScript-Website",
         "packages/documentation/copy/en/handbook-v2",
-        "verificar",
+        "CC-BY-4.0",
         _ts_url,
     ),
     "node": Source("node", "https://github.com/nodejs/node", "doc/api", "MIT", _node_url),

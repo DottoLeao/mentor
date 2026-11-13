@@ -38,8 +38,8 @@ uv run mentor-eval-retrieval
 
 | Fonte | Repositório | Licença |
 |---|---|---|
-| MDN (JavaScript) | mdn/content | CC-BY-SA 2.5. Toda resposta com trecho da MDN inclui a atribuição. |
-| TypeScript Handbook | microsoft/TypeScript-Website | a confirmar |
+| MDN (JavaScript) | mdn/content | CC-BY-SA 2.5 (texto). Toda resposta com trecho da MDN traz "by Mozilla Contributors", o link da página e o da licença. Trechos servidos continuam sob CC-BY-SA. |
+| TypeScript Handbook | microsoft/TypeScript-Website | CC BY 4.0 (conteúdo), MIT (código) |
 | Node.js API | nodejs/node | MIT |
 
 ## Qualidade da busca
