@@ -3,6 +3,7 @@
 import logging
 from importlib import resources
 
+import httpx
 import psycopg
 from pydantic import BaseModel
 from starlette.applications import Starlette
@@ -21,6 +22,7 @@ from mentor_server.search import search
 log = logging.getLogger("mentor_server")
 
 MAX_PERGUNTA = 2000
+STATEMENT_TIMEOUT_MS = 4000  # a resposta (ou o erro) precisa sair em até 5 s
 ATRIBUICAO_MDN = "Conteúdo da MDN Web Docs (Mozilla e colaboradores), licença CC-BY-SA 2.5."
 ERRO_PERGUNTA = "A pergunta precisa ter entre 1 e 2000 caracteres."
 ERRO_FONTE = "Fonte desconhecida. Use uma destas: mdn, typescript, node."
@@ -66,9 +68,9 @@ def build_server(database_url: str, embedder: Embedder, *, limiter=None) -> MCPS
         if limiter is not None:
             limiter(ctx)
         try:
-            with connect(database_url) as conn:
+            with connect(database_url, statement_timeout_ms=STATEMENT_TIMEOUT_MS) as conn:
                 hits = search(conn, embedder, pergunta, source=fonte, k=k)
-        except psycopg.Error as e:
+        except (psycopg.Error, httpx.HTTPError) as e:
             # Sem o texto da pergunta no log.
             log.error("busca indisponível: %s", type(e).__name__)
             raise ToolError(ERRO_BANCO) from None
@@ -121,8 +123,8 @@ def create_http_app(server: MCPServer | None = None) -> Starlette:
         settings = Settings()
         server = build_server(
             settings.database_url,
-            make_embedder(settings),
-            limiter=make_limiter(settings.database_url, settings.daily_limit),
+            make_embedder(settings, timeout=settings.query_timeout_s),
+            limiter=make_limiter(settings.database_url, settings.daily_limit, settings.global_daily_limit),
         )
     app = server.streamable_http_app(streamable_http_path="/mcp", host="0.0.0.0")
     app.add_route("/health", _health, methods=["GET"])

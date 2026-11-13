@@ -12,3 +12,5 @@ class Settings(BaseSettings):
     cf_account_id: str = ""
     cf_api_token: str = ""
     daily_limit: int = 200
+    global_daily_limit: int = 5000
+    query_timeout_s: float = 3.0

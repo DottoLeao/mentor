@@ -92,3 +92,18 @@ async def test_limite_estourado_avisa(http_url):
     rs = await _com_cliente(http_url, "b", tres_buscas)
     assert [r.is_error for r in rs] == [False, False, True]
     assert "chegou ao limite de 2 buscas de hoje" in rs[2].content[0].text
+
+
+@pytest.mark.db
+def test_teto_global_vale_mesmo_trocando_de_instalacao(db):
+    hoje = date(2026, 11, 13)
+    assert [consume(db, f"inst-{i}", 100, hoje, global_limit=3) for i in range(4)] == [True, True, True, False]
+
+
+@pytest.mark.db
+def test_registros_antigos_sao_apagados(db):
+    hoje = date(2026, 11, 13)
+    db.execute("insert into usage (install_id, day, count) values ('velho', %s, 5)", (hoje - timedelta(days=40),))
+    db.commit()
+    consume(db, "a", 10, hoje)
+    assert db.execute("select count(*) from usage where install_id = 'velho'").fetchone()[0] == 0

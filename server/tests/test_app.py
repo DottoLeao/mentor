@@ -48,3 +48,42 @@ async def test_banco_fora_do_ar(client_sem_banco):  # Review Focus 4
 async def test_prompts_incluem_regra_do_nivel_4(client_sem_banco):
     for nome in ["dica", "aula", "exercicio", "revisar", "prova", "entrevista"]:
         assert "nível 4" in await get_prompt(client_sem_banco, nome)
+
+
+class _EmbedderFora:
+    def embed(self, texts):
+        import httpx
+
+        raise httpx.ConnectError("provedor fora do ar")
+
+
+async def test_embedder_fora_vira_mensagem_pt():  # Review Focus 4
+    from conftest import TEST_DATABASE_URL
+    from mentor_server.app import build_server
+
+    r = await call(build_server(TEST_DATABASE_URL, _EmbedderFora()), "buscar_docs", {"pergunta": "x"})
+    assert r.is_error and "indisponível" in r.text
+
+
+@pytest.mark.db
+async def test_banco_que_trava_responde_em_5s(db, monkeypatch):  # Review Focus 4
+    from conftest import TEST_DATABASE_URL
+    from mentor_server import app as app_mod
+    from mentor_server.embed import FakeEmbedder
+
+    def busca_travada(conn, embedder, query, **kw):
+        conn.execute("select pg_sleep(10)")
+        return []
+
+    monkeypatch.setattr(app_mod, "search", busca_travada)
+    server = app_mod.build_server(TEST_DATABASE_URL, FakeEmbedder())
+    r = await asyncio.wait_for(call(server, "buscar_docs", {"pergunta": "x"}), 5)
+    assert r.is_error and "indisponível" in r.text
+
+
+def test_embedder_de_consulta_tem_timeout_curto():
+    from mentor_server.config import Settings
+    from mentor_server.embed import make_embedder
+
+    s = Settings(embed_provider="ollama")
+    assert make_embedder(s, timeout=s.query_timeout_s).timeout <= 4

@@ -60,9 +60,10 @@ class WorkersAIEmbedder:
         return r.json()["result"]["data"]
 
 
-def make_embedder(settings) -> Embedder:
+def make_embedder(settings, timeout: float | None = None) -> Embedder:
+    """Sem timeout: valores longos, para indexação. Para servir consultas, passe um curto."""
     if settings.embed_provider == "fake":
         return FakeEmbedder()
     if settings.embed_provider == "ollama":
-        return OllamaEmbedder(url=settings.ollama_url)
-    return WorkersAIEmbedder(settings.cf_account_id, settings.cf_api_token)
+        return OllamaEmbedder(url=settings.ollama_url, timeout=timeout or 120)
+    return WorkersAIEmbedder(settings.cf_account_id, settings.cf_api_token, timeout=timeout or 30)

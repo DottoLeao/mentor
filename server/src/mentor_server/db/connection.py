@@ -9,9 +9,10 @@ CONNECT_TIMEOUT_S = 3
 
 
 @contextmanager
-def connect(url: str) -> Iterator[psycopg.Connection]:
+def connect(url: str, *, statement_timeout_ms: int | None = None) -> Iterator[psycopg.Connection]:
     """Abre uma conexão com pgvector registrado. Fecha ao sair."""
-    conn = psycopg.connect(url, connect_timeout=CONNECT_TIMEOUT_S)
+    kwargs = {"options": f"-c statement_timeout={statement_timeout_ms}"} if statement_timeout_ms else {}
+    conn = psycopg.connect(url, connect_timeout=CONNECT_TIMEOUT_S, **kwargs)
     try:
         conn.execute("create extension if not exists vector")
         register_vector(conn)
