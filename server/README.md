@@ -46,15 +46,12 @@ uv run mentor-eval-retrieval
 
 Conjunto de 20 perguntas em `evals/retrieval.jsonl` (rascunho, em revisão), metade em português sobre documentação em inglês.
 
-Linha de base (13/11/2026, índice completo: 13.158 trechos da MDN, 296 do TypeScript, 6.974 do Node; bge-m3 local):
+A medição usa os trechos exatamente como a ferramenta devolve, na ordem, sem juntar trechos da mesma página.
 
-| Métrica | Valor |
-|---|---|
-| recall@5 | 0,80 |
-| MRR | 0,55 |
+| Data | Índice | recall@5 | MRR |
+|---|---|---|---|
+| 13/11/2026 | 14.568 trechos da MDN, 320 do TypeScript, 6.974 do Node; bge-m3 local | 0,95 | 0,75 |
 
-Falhas conhecidas:
+Antes da correção na divisão em trechos, que descartava a introdução das páginas da MDN, a medida equivalente era pior: na pergunta "como pego um valor de um Map?", `Map.prototype.get()` aparecia só em 6º lugar.
 
-- **"Como adiciono um item no fim de um array?" e "como sei se um array contém um valor?"** trazem a página geral de `Array` antes de `push` e `includes`. A página certa existe no índice, mas perde no ranking. Um reranker é o próximo passo.
-- **"Como guardo valores sem repetição?"** não encontra `Set`.
-- **"satisfies operator"** espera uma página das notas de versão do TypeScript, que não está indexada (só o Handbook está). O caso precisa ser revisto.
+Falha conhecida: **"satisfies operator"** espera uma página das notas de versão do TypeScript, que não está indexada (só o Handbook está). O caso precisa ser revisto.
