@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { isAbsolute, relative, resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -31,6 +32,17 @@ const ok = (dados: unknown): Resposta => ({
 });
 const erro = (msg: string): Resposta => ({ content: [{ type: "text", text: msg }], isError: true });
 
+const filas = new Map<string, Promise<unknown>>();
+function naFila<T>(chave: string, fn: () => Promise<T>): Promise<T> {
+  const anterior = filas.get(chave) ?? Promise.resolve();
+  const atual = anterior.then(fn, fn);
+  filas.set(chave, atual.catch(() => undefined));
+  return atual;
+}
+
+/** Só letras, números, _ . / \ - e espaço, terminando em .ts ou .js: nada que um shell interprete. */
+const ARQUIVO_EXECUTAVEL = /^[A-Za-z0-9_./\\ -]+\.(ts|js)$/;
+
 function dentro(dir: string, arquivo: string): string {
   const alvo = resolve(dir, arquivo);
   const rel = relative(resolve(dir), alvo);
@@ -49,12 +61,16 @@ export function criarServidorLocal(ctx: Contexto): McpServer {
   async function comMemoria(fn: (dir: string, m: Memoria, aviso?: string) => Promise<Resposta>): Promise<Resposta> {
     const dir = ctx.pastaWorkspace();
     if (!dir) return erro(SEM_PASTA);
-    try {
-      const { memoria, aviso } = await carregarMemoria(dir);
-      return await fn(dir, memoria, aviso);
-    } catch (e) {
-      return erro((e as Error).message);
-    }
+    // Uma operação de memória por vez nesta pasta: chamadas paralelas não perdem atualizações.
+    return naFila(dir, async () => {
+      try {
+        const { memoria, aviso } = await carregarMemoria(dir);
+        const r = await fn(dir, memoria, aviso);
+        return aviso ? { ...r, content: [{ type: "text" as const, text: aviso }, ...r.content] } : r;
+      } catch (e) {
+        return erro((e as Error).message);
+      }
+    });
   }
   const trilha = (m: Memoria) => TRILHAS[m.trilha] ?? TRILHAS["typescript-fundamentos"];
 
@@ -165,12 +181,16 @@ export function criarServidorLocal(ctx: Contexto): McpServer {
       return ok("Configuração aberta.");
     })(),
   );
-  s.registerTool("rodar_teste", { description: "Roda um arquivo de exercício (.ts ou .js) com node no terminal do VS Code.", inputSchema: { arquivo: z.string() } }, ({ arquivo }) =>
+  s.registerTool("rodar_teste", { description: "Roda um arquivo de exercício (.ts ou .js) com node, sem shell, e mostra a saída no VS Code.", inputSchema: { arquivo: z.string() } }, ({ arquivo }) =>
     naPasta(async (dir) => {
-      dentro(dir, arquivo);
-      if (!/\.(ts|js)$/.test(arquivo) || /["`$]/.test(arquivo)) return erro("Só dá para rodar arquivos .ts ou .js da pasta de estudos.");
-      await ctx.acoes.rodarNoTerminal(`node "${arquivo}"`);
-      return ok("Rodando no terminal Mentor.");
+      if (!ARQUIVO_EXECUTAVEL.test(arquivo)) {
+        return erro("Só dá para rodar arquivos .ts ou .js da pasta de estudos, com nome sem caracteres especiais.");
+      }
+      const caminho = dentro(dir, arquivo);
+      const info = await stat(caminho).catch(() => undefined);
+      if (!info?.isFile()) return erro(`O arquivo ${arquivo} não existe na pasta de estudos.`);
+      await ctx.acoes.rodarNode(caminho);
+      return ok("Rodando com node no VS Code.");
     })(),
   );
   s.registerTool("sugerir_extensao", { description: "Sugere instalar uma extensão do VS Code, dizendo o motivo. A pessoa decide se instala.", inputSchema: { id: z.string().regex(/^[\w-]+\.[\w-]+$/), motivo: z.string().max(200) } }, ({ id, motivo }) =>
@@ -192,6 +212,25 @@ async function lerCorpo(req: IncomingMessage): Promise<unknown> {
 }
 
 /** Sobe o MCP local só em 127.0.0.1, sem estado, exigindo o token em X-Mentor-Token. */
+/** Tenta a porta pedida e as seguintes: outra janela do VS Code com o Mentor pode estar usando a padrão. */
+export async function iniciarHttpComFallback(
+  fabrica: () => McpServer,
+  porta: number,
+  token: string,
+  tentativas = 10,
+): Promise<{ porta: number; fechar(): Promise<void> }> {
+  let ultimo: unknown;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await iniciarHttp(fabrica, porta + i, token);
+    } catch (e) {
+      if (!(e instanceof PortaOcupada)) throw e;
+      ultimo = e;
+    }
+  }
+  throw ultimo;
+}
+
 export function iniciarHttp(fabrica: () => McpServer, porta: number, token: string): Promise<{ porta: number; fechar(): Promise<void> }> {
   const http = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {

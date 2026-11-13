@@ -7,7 +7,7 @@ import { hojeLocal } from "./core/datas";
 import { importarDiario } from "./core/importar-diario";
 import { carregarMemoria, salvarMemoria } from "./core/memoria";
 import { TRILHAS } from "./core/trilha";
-import { SEM_PASTA, criarServidorLocal, iniciarHttp, type Contexto } from "./mcp/servidor-local";
+import { SEM_PASTA, criarServidorLocal, iniciarHttpComFallback, type Contexto } from "./mcp/servidor-local";
 import { AcoesVsCode } from "./vscode-acoes";
 import { carregarConfig } from "./core/config";
 import { renderCaminho } from "./telas/caminho";
@@ -19,23 +19,24 @@ export function pastaWorkspace(): string | undefined {
   return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
-function segredo(ctx: vscode.ExtensionContext, chave: string): string {
-  let v = ctx.globalState.get<string>(chave);
+function segredo(memento: vscode.Memento, chave: string): string {
+  let v = memento.get<string>(chave);
   if (!v) {
     v = randomUUID();
-    void ctx.globalState.update(chave, v);
+    void memento.update(chave, v);
   }
   return v;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const token = segredo(context, "mentor.token");
-  const idInstalacao = segredo(context, "mentor.idInstalacao");
+  // Token por pasta: duas janelas do VS Code nunca aceitam o Claude Code uma da outra.
+  const token = segredo(context.workspaceState, "mentor.token");
+  const idInstalacao = segredo(context.globalState, "mentor.idInstalacao");
   const config = () => vscode.workspace.getConfiguration("mentor");
   const contexto: Contexto = { pastaWorkspace, hoje: () => hojeLocal(), acoes: new AcoesVsCode() };
 
   try {
-    servidor = await iniciarHttp(() => criarServidorLocal(contexto), config().get<number>("portaLocal", 39217), token);
+    servidor = await iniciarHttpComFallback(() => criarServidorLocal(contexto), config().get<number>("portaLocal", 39217), token);
   } catch (e) {
     void vscode.window.showWarningMessage((e as Error).message);
   }
@@ -62,14 +63,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand(
       "mentor.abrirCaminho",
       abrirTela("Mentor · Caminho", async (dir, nonce) => {
-        const { memoria } = await carregarMemoria(dir);
+        const { memoria, aviso } = await carregarMemoria(dir);
+        if (aviso) void vscode.window.showWarningMessage(aviso);
         return renderCaminho(TRILHAS[memoria.trilha] ?? trilha(), memoria, hojeLocal(), nonce);
       }),
     ),
     vscode.commands.registerCommand(
       "mentor.abrirPainel",
       abrirTela("Mentor · Progresso", async (dir, nonce) => {
-        const { memoria } = await carregarMemoria(dir);
+        const { memoria, aviso } = await carregarMemoria(dir);
+        if (aviso) void vscode.window.showWarningMessage(aviso);
         return renderPainel(TRILHAS[memoria.trilha] ?? trilha(), memoria, await carregarConfig(dir), hojeLocal(), nonce);
       }),
     ),
@@ -98,7 +101,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!dir) return void vscode.window.showWarningMessage(SEM_PASTA);
       const escolha = await vscode.window.showOpenDialog({ canSelectMany: false, filters: { Markdown: ["md"] }, openLabel: "Importar diário" });
       if (!escolha?.[0]) return;
-      const { memoria: atual } = await carregarMemoria(dir);
+      const { memoria: atual, aviso } = await carregarMemoria(dir);
+      if (aviso) void vscode.window.showWarningMessage(aviso);
       if (Object.keys(atual.concluidos).length > 0) {
         const ok = await vscode.window.showWarningMessage("Já existe progresso nesta pasta. Importar o diário substitui esse progresso.", { modal: true }, "Substituir");
         if (ok !== "Substituir") return;

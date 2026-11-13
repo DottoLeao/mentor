@@ -6,7 +6,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import type { AcoesEditor } from "../../src/mcp/acoes";
-import { PortaOcupada, criarServidorLocal, iniciarHttp, type Contexto } from "../../src/mcp/servidor-local";
+import { PortaOcupada, criarServidorLocal, iniciarHttp, iniciarHttpComFallback, type Contexto } from "../../src/mcp/servidor-local";
+import { mkdir, writeFile } from "node:fs/promises";
 import { TRILHAS } from "../../src/core/trilha";
 
 const T = TRILHAS["typescript-fundamentos"];
@@ -17,7 +18,7 @@ class AcoesFalsas implements AcoesEditor {
   async abrirArquivo(c: string, l?: number) { this.chamadas.push(`abrir ${c} ${l ?? ""}`.trim()); }
   async destacarLinha(c: string, l: number, m: string) { this.chamadas.push(`destacar ${c} ${l} ${m}`); }
   async abrirConfiguracao(k: string) { this.chamadas.push(`config ${k}`); }
-  async rodarNoTerminal(cmd: string) { this.chamadas.push(`terminal ${cmd}`); }
+  async rodarNode(arquivo: string) { this.chamadas.push(`node ${arquivo}`); }
   async sugerirExtensao(id: string, motivo: string) { this.chamadas.push(`ext ${id} ${motivo}`); return "recusada" as const; }
 }
 
@@ -100,9 +101,11 @@ test("sem pasta aberta → mensagem clara", async () => {
 
 test("rodar_teste e destacar_linha chamam as ações do editor", async () => {
   const c = await cliente();
+  await mkdir(join(tmp!, "semana-4"), { recursive: true });
+  await writeFile(join(tmp!, "semana-4/x.ts"), "");
   await c.callTool({ name: "rodar_teste", arguments: { arquivo: "semana-4/x.ts" } });
   await c.callTool({ name: "destacar_linha", arguments: { arquivo: "semana-4/x.ts", linha: 3, mensagem: "olhe aqui" } });
-  expect(acoes.chamadas).toContain('terminal node "semana-4/x.ts"');
+  expect(acoes.chamadas).toContain(`node ${join(tmp!, "semana-4", "x.ts")}`);
   expect(acoes.chamadas.some((x) => x.startsWith("destacar") && x.includes(" 3 olhe aqui"))).toBe(true);
   await c.close();
 });
@@ -134,4 +137,44 @@ test("prompt de nivelamento orienta a chamar registrar_nivelamento", async () =>
   const p = await c.getPrompt({ name: "nivelamento" });
   expect(JSON.stringify(p.messages)).toContain("registrar_nivelamento");
   await c.close();
+});
+
+
+test("rodar_teste recusa nomes que poderiam injetar comando e arquivos que não existem", async () => {
+  const c = await cliente();
+  for (const arquivo of ["a” ; calc ; “b.ts", "x.ts\nwhoami", "%PATH%.ts", "nao-existe.ts", "x.py"]) {
+    const r: any = await c.callTool({ name: "rodar_teste", arguments: { arquivo } });
+    expect(r.isError, arquivo).toBe(true);
+  }
+  expect(acoes.chamadas.filter((x) => x.startsWith("node"))).toEqual([]);
+  await c.close();
+});
+
+test("aviso de arquivo corrompido chega também em registrar_resultado", async () => {
+  await mkdir(join(tmp!, ".mentor"), { recursive: true });
+  await writeFile(join(tmp!, ".mentor/progresso.json"), "{ quebrado");
+  const c = await cliente();
+  const r: any = await c.callTool({ name: "registrar_resultado", arguments: { alvo: "x", resultado: "sem_dica" } });
+  expect(texto(r)).toMatch(/corrompido/);
+  await c.close();
+});
+
+test("chamadas simultâneas não perdem atualizações", async () => {
+  const c = await cliente();
+  await Promise.all(
+    Array.from({ length: 8 }, (_, i) => c.callTool({ name: "registrar_resultado", arguments: { alvo: `item-${i}`, resultado: "sem_dica" } })),
+  );
+  const salvo = JSON.parse(await readFile(join(tmp!, ".mentor/progresso.json"), "utf8"));
+  expect(salvo.revisoes).toHaveLength(8);
+  await c.close();
+});
+
+test("com a porta ocupada, usa a próxima livre", async () => {
+  const ocupada = await portaLivre();
+  const s: Server = createServer().listen(ocupada, "127.0.0.1");
+  await new Promise((ok) => s.once("listening", ok));
+  const h = await iniciarHttpComFallback(() => criarServidorLocal(ctx()), ocupada, TOKEN, 5);
+  expect(h.porta).not.toBe(ocupada);
+  await h.fechar();
+  await new Promise((ok) => s.close(ok));
 });

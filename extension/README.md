@@ -6,7 +6,7 @@ A conversa acontece no Claude Code, que você já usa. A extensão dá a ele tr�
 
 1. **Memória do seu progresso.** O que você domina, o que ainda precisa de dica, os erros que se repetem e as revisões do dia (revisão espaçada).
 2. **A trilha.** Oito unidades de fundamentos em TypeScript, com exercícios no formato do HackerRank e link para o roadmap.sh em cada unidade.
-3. **Ações no editor.** Abrir o exercício, destacar a linha onde olhar, rodar os testes no terminal e sugerir extensões, sempre com a sua confirmação.
+3. **Ações no editor.** Abrir o exercício, destacar a linha onde olhar, rodar os testes com node e sugerir extensões. Instalar uma extensão sempre pede a sua confirmação; as outras ações seguem a permissão por ferramenta do Claude Code. Rodar um exercício executa código JavaScript dele na sua máquina, então não marque essas ferramentas como "sempre permitir" sem pensar.
 
 ## Instalar
 

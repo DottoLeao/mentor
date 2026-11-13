@@ -80,7 +80,7 @@ export async function carregarMemoria(dir: string, trilhaPadrao = "typescript-fu
 export async function salvarMemoria(dir: string, m: Memoria): Promise<void> {
   const pasta = join(dir, PASTA);
   await mkdir(pasta, { recursive: true });
-  const tmp = join(pasta, `${ARQUIVO}.tmp`);
+  const tmp = join(pasta, `${ARQUIVO}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`);
   await writeFile(tmp, JSON.stringify(m, null, 2), "utf8");
   await rename(tmp, join(pasta, ARQUIVO));
 }

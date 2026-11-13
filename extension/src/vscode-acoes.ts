@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { dirname } from "node:path";
 import type { AcoesEditor } from "./mcp/acoes";
 
 const destaque = vscode.window.createTextEditorDecorationType({
@@ -6,7 +7,7 @@ const destaque = vscode.window.createTextEditorDecorationType({
   isWholeLine: true,
 });
 
-let terminal: vscode.Terminal | undefined;
+
 
 export class AcoesVsCode implements AcoesEditor {
   async abrirArquivo(caminho: string, linha?: number): Promise<void> {
@@ -31,10 +32,17 @@ export class AcoesVsCode implements AcoesEditor {
     await vscode.commands.executeCommand("workbench.action.openSettings", chave);
   }
 
-  async rodarNoTerminal(comando: string): Promise<void> {
-    if (!terminal || terminal.exitStatus) terminal = vscode.window.createTerminal("Mentor");
-    terminal.show(true);
-    terminal.sendText(comando);
+  async rodarNode(arquivo: string): Promise<void> {
+    // ProcessExecution não passa por shell: o caminho vai como argumento, sem ser interpretado.
+    const tarefa = new vscode.Task(
+      { type: "mentor", arquivo },
+      vscode.TaskScope.Workspace,
+      `Mentor: rodar ${vscode.workspace.asRelativePath(arquivo)}`,
+      "mentor",
+      new vscode.ProcessExecution("node", [arquivo], { cwd: dirname(arquivo) }),
+    );
+    tarefa.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true };
+    await vscode.tasks.executeTask(tarefa);
   }
 
   async sugerirExtensao(id: string, motivo: string): Promise<"instalada" | "recusada"> {
