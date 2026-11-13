@@ -42,8 +42,8 @@ def main() -> None:
     results, expected, detalhes = [], [], []
     with connect(settings.database_url) as conn:
         for c in casos:
-            # URLs únicas na ordem do ranking (várias seções da mesma página contam como uma)
-            urls = list(dict.fromkeys(h.url for h in search(conn, embedder, c["pergunta"], k=10)))
+            # Mede exatamente o que a ferramenta devolve: os trechos na ordem, sem juntar por URL.
+            urls = [h.url for h in search(conn, embedder, c["pergunta"], k=10)]
             results.append(urls)
             expected.append(set(c["urls_esperadas"]))
             detalhes.append({**c, "urls_obtidas": urls[:5]})

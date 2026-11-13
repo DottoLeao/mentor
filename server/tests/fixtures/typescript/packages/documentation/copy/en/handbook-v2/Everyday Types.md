@@ -3,7 +3,6 @@ title: Everyday Types
 permalink: /docs/handbook/2/everyday-types.html
 ---
 
-# Everyday Types
 
 In this chapter, we'll cover some of the most common types of values you'll find in JavaScript code.
 

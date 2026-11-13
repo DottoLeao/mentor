@@ -41,3 +41,61 @@ def test_titulo_dentro_de_bloco_de_codigo_nao_e_titulo():
     chunks = split_markdown(md, source="s", url="u")
     assert [c.title_path for c in chunks] == ["A"]
     assert "# comentario" in chunks[0].content
+
+
+MDN_REAL = """---
+title: Map.prototype.get()
+slug: Web/JavaScript/Reference/Global_Objects/Map/get
+page-type: javascript-instance-method
+---
+
+The **`get()`** method of {{jsxref("Map")}} instances returns a specified element from this map.
+
+## Syntax
+
+```js-nolint
+get(key)
+```
+
+### Parameters
+
+- `key`
+  - : The key of the element to return from the `Map` object.
+
+### Return value
+
+The element associated with the specified key.
+
+## Examples
+
+### Using get()
+
+```js
+myMap.get("bar");
+```
+"""
+
+
+def test_titulo_do_front_matter_vira_raiz_e_introducao_e_mantida():
+    chunks = split_markdown(MDN_REAL, source="mdn", url="u")
+    assert [c.title_path for c in chunks] == [
+        "Map.prototype.get()",
+        "Map.prototype.get() > Syntax",
+        "Map.prototype.get() > Syntax > Parameters",
+        "Map.prototype.get() > Syntax > Return value",
+        "Map.prototype.get() > Examples > Using get()",
+    ]
+    assert "returns a specified element" in chunks[0].content
+
+
+def test_irmaos_do_mesmo_nivel_sem_h1_nao_se_aninham():
+    chunks = split_markdown("## B\nx\n## C\ny\n### D\nz\n## E\nw", source="s", url="u")
+    assert [c.title_path for c in chunks] == ["B", "C", "C > D", "E"]
+
+
+def test_h1_igual_ao_titulo_nao_duplica():
+    md = "---\ntitle: File system\n---\n# File system\nintro\n## readFile\nx"
+    assert [c.title_path for c in split_markdown(md, source="s", url="u")] == [
+        "File system",
+        "File system > readFile",
+    ]

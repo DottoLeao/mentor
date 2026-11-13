@@ -14,39 +14,51 @@ class Chunk:
     content: str
 
 
-def _strip_front_matter(text: str) -> str:
+def _split_front_matter(text: str) -> tuple[str | None, str]:
+    """Devolve (title do front matter, corpo sem o front matter)."""
     if text.startswith("---\n"):
         end = text.find("\n---\n", 4)
         if end != -1:
-            return text[end + 5 :]
-    return text
+            title = None
+            for line in text[4:end].splitlines():
+                m = re.match(r"^title:\s*(.+)$", line)
+                if m:
+                    title = m.group(1).strip().strip("\"'")
+            return title, text[end + 5 :]
+    return None, text
 
 
 def _is_fence(line: str) -> bool:
     return line.lstrip().startswith("```")
 
 
-def _sections(text: str) -> list[tuple[str, list[str]]]:
+def _sections(text: str, root: str | None) -> list[tuple[str, list[str]]]:
+    """Seções por título. O title do front matter é a raiz; o texto antes do
+    primeiro título pertence à raiz. Títulos fecham os de nível igual ou maior."""
     sections: list[tuple[str, list[str]]] = []
-    stack: list[str] = []
+    stack: list[tuple[int, str]] = [(0, root)] if root else []
     lines: list[str] = []
     in_code = False
 
     def flush():
         if stack:
-            sections.append((" > ".join(stack), lines))
+            sections.append((" > ".join(t for _, t in stack), lines))
 
     for line in text.splitlines():
         if _is_fence(line):
             in_code = not in_code
         m = None if in_code or _is_fence(line) else _HEADING.match(line)
-        if m:
-            flush()
-            level = len(m.group(1))
-            stack = stack[: level - 1] + [m.group(2)]
-            lines = []
-        else:
+        if not m:
             lines.append(line)
+            continue
+        level, title = len(m.group(1)), m.group(2)
+        if root and level == 1 and title == root:
+            continue  # h1 repete o title do front matter
+        flush()
+        lines = []
+        while stack and stack[-1][0] >= level:
+            stack.pop()
+        stack.append((level, title))
     flush()
     return sections
 
@@ -117,7 +129,8 @@ def _pack(blocks: list[str], max_chars: int) -> list[str]:
 
 def split_markdown(text: str, *, source: str, url: str, max_chars: int = 1200) -> list[Chunk]:
     chunks: list[Chunk] = []
-    for title_path, lines in _sections(_strip_front_matter(text)):
+    root, body = _split_front_matter(text)
+    for title_path, lines in _sections(body, root):
         for i, part in enumerate(_pack(_blocks(lines), max_chars), start=1):
             path = title_path if i == 1 else f"{title_path} (parte {i})"
             chunks.append(Chunk(source=source, url=url, title_path=path, content=part))

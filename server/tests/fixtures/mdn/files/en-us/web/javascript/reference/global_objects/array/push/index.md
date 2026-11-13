@@ -3,7 +3,6 @@ title: Array.prototype.push()
 slug: Web/JavaScript/Reference/Global_Objects/Array/push
 ---
 
-# Array.prototype.push()
 
 The **`push()`** method of `Array` instances adds the specified elements to the end of an array and returns the new length of the array.
 
