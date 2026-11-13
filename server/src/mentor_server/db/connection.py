@@ -15,6 +15,7 @@ def connect(url: str) -> Iterator[psycopg.Connection]:
     try:
         conn.execute("create extension if not exists vector")
         register_vector(conn)
+        conn.commit()  # não deixar transação aberta: senão conn.transaction() vira savepoint e nada é gravado
         yield conn
     finally:
         conn.close()

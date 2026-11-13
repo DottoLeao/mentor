@@ -7,7 +7,7 @@ import psycopg
 from pydantic import BaseModel
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -15,6 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mentor_server.db.connection import connect
 from mentor_server.embed import Embedder
 from mentor_server.ingest.sources import SOURCES
+from mentor_server.ratelimit import ERRO_SEM_INSTALACAO, HEADER
 from mentor_server.search import search
 
 log = logging.getLogger("mentor_server")
@@ -96,13 +97,34 @@ async def _health(_: Request) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
+class _ExigeInstalacao:
+    """Recusa POST /mcp sem o cabeçalho X-Mentor-Install, antes de chegar no MCP."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["method"] == "POST" and scope["path"].rstrip("/") == "/mcp":
+            headers = {k.decode().lower(): v for k, v in scope["headers"]}
+            if not headers.get(HEADER):
+                await PlainTextResponse(ERRO_SEM_INSTALACAO, status_code=400)(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def create_http_app(server: MCPServer | None = None) -> Starlette:
     if server is None:
         from mentor_server.config import Settings
         from mentor_server.embed import make_embedder
+        from mentor_server.ratelimit import make_limiter
 
         settings = Settings()
-        server = build_server(settings.database_url, make_embedder(settings))
+        server = build_server(
+            settings.database_url,
+            make_embedder(settings),
+            limiter=make_limiter(settings.database_url, settings.daily_limit),
+        )
     app = server.streamable_http_app(streamable_http_path="/mcp", host="0.0.0.0")
     app.add_route("/health", _health, methods=["GET"])
+    app.add_middleware(_ExigeInstalacao)
     return app
