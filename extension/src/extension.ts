@@ -9,6 +9,9 @@ import { carregarMemoria, salvarMemoria } from "./core/memoria";
 import { TRILHAS } from "./core/trilha";
 import { SEM_PASTA, criarServidorLocal, iniciarHttp, type Contexto } from "./mcp/servidor-local";
 import { AcoesVsCode } from "./vscode-acoes";
+import { carregarConfig } from "./core/config";
+import { renderCaminho } from "./telas/caminho";
+import { renderPainel } from "./telas/painel";
 
 let servidor: { porta: number; fechar(): Promise<void> } | undefined;
 
@@ -37,7 +40,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void vscode.window.showWarningMessage((e as Error).message);
   }
 
+  const abrirTela = (titulo: string, render: (dir: string, nonce: string) => Promise<string>) => async () => {
+    const dir = pastaWorkspace();
+    if (!dir) return void vscode.window.showWarningMessage(SEM_PASTA);
+    const painel = vscode.window.createWebviewPanel("mentor", titulo, vscode.ViewColumn.Active, { enableScripts: true });
+    const atualizar = async () => {
+      painel.webview.html = await render(dir, randomUUID().replace(/-/g, ""));
+    };
+    await atualizar();
+    painel.onDidChangeViewState((e) => e.webviewPanel.visible && void atualizar());
+    painel.webview.onDidReceiveMessage(async (msg) => {
+      if (msg?.tipo === "comecar") {
+        await vscode.env.clipboard.writeText("Mentor, vamos para o próximo passo.");
+        void vscode.window.showInformationMessage("Copiei \"Mentor, vamos para o próximo passo.\". Cole na conversa do Claude Code.");
+      }
+    });
+  };
+  const trilha = () => TRILHAS["typescript-fundamentos"];
+
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "mentor.abrirCaminho",
+      abrirTela("Mentor · Caminho", async (dir, nonce) => {
+        const { memoria } = await carregarMemoria(dir);
+        return renderCaminho(TRILHAS[memoria.trilha] ?? trilha(), memoria, hojeLocal(), nonce);
+      }),
+    ),
+    vscode.commands.registerCommand(
+      "mentor.abrirPainel",
+      abrirTela("Mentor · Progresso", async (dir, nonce) => {
+        const { memoria } = await carregarMemoria(dir);
+        return renderPainel(TRILHAS[memoria.trilha] ?? trilha(), memoria, await carregarConfig(dir), hojeLocal(), nonce);
+      }),
+    ),
     vscode.commands.registerCommand("mentor.conectarClaudeCode", async () => {
       const dir = pastaWorkspace();
       if (!dir) return void vscode.window.showWarningMessage(SEM_PASTA);
