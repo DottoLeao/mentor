@@ -28,3 +28,44 @@ def db():
         conn.execute("truncate chunks, usage restart identity")
         conn.commit()
         yield conn
+
+
+FIXTURES_DIR = __import__("pathlib").Path(__file__).parent / "fixtures"
+
+
+def _indexar_fixtures(conn, embedder, tmp_path, monkeypatch):
+    from mentor_server.ingest import indexer
+
+    def _fetch(src, workdir):
+        return "fixture-sha", sorted((FIXTURES_DIR / src.name / src.subdir).rglob("*.md"))
+
+    monkeypatch.setattr(indexer, "fetch_source", _fetch)
+    for nome in ("mdn", "typescript", "node"):
+        indexer.index_source(conn, nome, embedder, tmp_path)
+    return conn
+
+
+@pytest.fixture
+def db_indexado_fake(db, tmp_path, monkeypatch):
+    from mentor_server.embed import FakeEmbedder
+
+    return _indexar_fixtures(db, FakeEmbedder(), tmp_path, monkeypatch)
+
+
+def _ollama_ok() -> bool:
+    import httpx
+
+    try:
+        r = httpx.get("http://localhost:11434/api/tags", timeout=2)
+        return any(m["name"].startswith("bge-m3") for m in r.json().get("models", []))
+    except Exception:
+        return False
+
+
+@pytest.fixture
+def db_indexado_bge(db, tmp_path, monkeypatch):
+    if not _ollama_ok():
+        pytest.skip("Ollama com bge-m3 indisponível")
+    from mentor_server.embed import OllamaEmbedder
+
+    return _indexar_fixtures(db, OllamaEmbedder(), tmp_path, monkeypatch)
