@@ -1,0 +1,44 @@
+{
+  "name": "mentor",
+  "displayName": "Mentor de Programação",
+  "description": "Mentor de programação em português dentro do VS Code: trilha guiada, dicas em camadas e progresso salvo no seu workspace.",
+  "version": "0.1.0",
+  "publisher": "dottoleao",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/DottoLeao/mentor" },
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Education", "Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "mentor.conectarClaudeCode", "title": "Mentor: conectar ao Claude Code" },
+      { "command": "mentor.abrirCaminho", "title": "Mentor: abrir o caminho" },
+      { "command": "mentor.abrirPainel", "title": "Mentor: abrir o painel de progresso" },
+      { "command": "mentor.importarDiario", "title": "Mentor: importar diário de estudos" }
+    ],
+    "configuration": {
+      "title": "Mentor",
+      "properties": {
+        "mentor.portaLocal": { "type": "number", "default": 39217, "description": "Porta do servidor MCP local (só em 127.0.0.1)." },
+        "mentor.urlConhecimento": { "type": "string", "default": "http://localhost:8000/mcp", "description": "Endereço do servidor de conhecimento (busca nas docs oficiais)." }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "~1.95.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.23.0"
+  }
+}

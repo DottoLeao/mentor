@@ -1,0 +1,44 @@
+[
+  {
+    "id": "dbaeumer.vscode-eslint",
+    "nome": "ESLint",
+    "publicador": "Microsoft",
+    "motivo": "Mostra no editor os problemas de estilo e os erros comuns de JavaScript e TypeScript enquanto você digita, antes de rodar o código.",
+    "gatilhos": ["estilo", "eslint", "lint", "erro de estilo", "ponto e vírgula"]
+  },
+  {
+    "id": "esbenp.prettier-vscode",
+    "nome": "Prettier",
+    "publicador": "Prettier",
+    "motivo": "Formata o arquivo sozinho ao salvar, para você parar de gastar tempo com indentação e espaços.",
+    "gatilhos": ["formatar", "formatação", "indentação"]
+  },
+  {
+    "id": "eamodio.gitlens",
+    "nome": "GitLens",
+    "publicador": "GitKraken",
+    "motivo": "Mostra o histórico do Git direto no código: quem mudou cada linha, em qual commit e por quê.",
+    "gatilhos": ["git", "commit", "histórico", "blame"]
+  },
+  {
+    "id": "usernamehw.errorlens",
+    "nome": "Error Lens",
+    "publicador": "Alexander",
+    "motivo": "Escreve a mensagem de erro na própria linha, para você ler o erro em vez de só ver o sublinhado vermelho.",
+    "gatilhos": ["erro", "sublinhado vermelho", "mensagem de erro"]
+  },
+  {
+    "id": "streetsidesoftware.code-spell-checker",
+    "nome": "Code Spell Checker",
+    "publicador": "Street Side Software",
+    "motivo": "Aponta erros de digitação em nomes de variáveis e comentários, que viram bugs difíceis de achar.",
+    "gatilhos": ["ortografia", "typo", "nome de variável"]
+  },
+  {
+    "id": "ms-vscode.vscode-typescript-next",
+    "nome": "JavaScript and TypeScript Nightly",
+    "publicador": "Microsoft",
+    "motivo": "Faz o editor usar a versão mais nova do TypeScript, para testar um recurso que ainda não saiu na versão estável.",
+    "gatilhos": ["typescript nightly", "versão nova do typescript"]
+  }
+]
