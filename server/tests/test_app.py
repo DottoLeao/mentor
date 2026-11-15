@@ -46,8 +46,18 @@ async def test_banco_fora_do_ar(client_sem_banco):  # Review Focus 4
 
 
 async def test_prompts_incluem_regra_do_nivel_4(client_sem_banco):
-    for nome in ["dica", "aula", "exercicio", "revisar", "prova", "entrevista"]:
+    for nome in ["dica", "aula", "exercicio", "revisar", "prova", "entrevista", "processo", "vscode"]:
         assert "nível 4" in await get_prompt(client_sem_banco, nome)
+
+
+async def test_prompt_processo(client_sem_banco):
+    texto = await get_prompt(client_sem_banco, "processo")
+    assert "commit" in texto and "pull request" in texto
+
+
+async def test_prompt_vscode(client_sem_banco):
+    texto = await get_prompt(client_sem_banco, "vscode")
+    assert "destacar_linha" in texto and "buscar_docs" in texto and "recomendar_extensao" in texto
 
 
 class _EmbedderFora:

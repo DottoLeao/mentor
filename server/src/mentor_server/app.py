@@ -37,7 +37,7 @@ ERRO_FONTE = f"Fonte desconhecida. Use uma destas: {', '.join(SOURCES)}."
 ERRO_K = "O número de trechos (k) precisa estar entre 1 e 10."
 ERRO_BANCO = "A busca está indisponível agora. Tente de novo em alguns minutos."
 
-PROMPTS = ["dica", "aula", "exercicio", "revisar", "prova", "entrevista"]
+PROMPTS = ["dica", "aula", "exercicio", "revisar", "prova", "entrevista", "processo", "vscode"]
 
 
 def _atribuicao(fontes: set[str]) -> str:
