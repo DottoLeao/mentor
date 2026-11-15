@@ -1,0 +1,51 @@
+name: Reindexação semanal
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # segunda-feira, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reindexar
+  cancel-in-progress: false
+
+jobs:
+  reindexar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: server
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      EMBED_PROVIDER: workers_ai
+    steps:
+      - uses: actions/checkout@v4
+      - id: segredos
+        name: Checar segredos
+        run: python3 scripts/checar_segredos.py DATABASE_URL CF_ACCOUNT_ID CF_API_TOKEN
+      - if: steps.segredos.outputs.pular == 'true'
+        run: echo "::warning::Segredos ausentes; reindexação pulada."
+      - if: steps.segredos.outputs.pular != 'true'
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - if: steps.segredos.outputs.pular != 'true'
+        run: uv sync --locked
+      - if: steps.segredos.outputs.pular != 'true'
+        name: Reindexar todas as fontes
+        run: uv run mentor-index all
+      - if: steps.segredos.outputs.pular != 'true'
+        name: Avaliar a recuperação
+        run: uv run mentor-eval-retrieval
+      - if: steps.segredos.outputs.pular != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: retrieval
+          path: server/evals/out/retrieval.json

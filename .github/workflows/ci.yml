@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Servidor (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: mentor
+          POSTGRES_PASSWORD: mentor
+          POSTGRES_DB: mentor_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U mentor -d mentor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: server
+    env:
+      TEST_DATABASE_URL: postgresql://mentor:mentor@localhost:5433/mentor_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -q -m "not slow"
+
+  extension:
+    name: Extensão (vitest, tsc, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: existe
+        run: |
+          if [ -f extension/package.json ]; then
+            echo "existe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::extension/package.json não existe neste branch, pulando os passos da extensão."
+            echo "existe=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.existe.outputs.existe == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - if: steps.existe.outputs.existe == 'true'
+        working-directory: extension
+        run: npm ci
+      - if: steps.existe.outputs.existe == 'true'
+        working-directory: extension
+        run: npm test
+      - if: steps.existe.outputs.existe == 'true'
+        working-directory: extension
+        run: npx tsc --noEmit
+      - if: steps.existe.outputs.existe == 'true'
+        working-directory: extension
+        run: npm run build

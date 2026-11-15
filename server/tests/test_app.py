@@ -31,7 +31,7 @@ async def test_pergunta_invalida(client_fake, pergunta):  # Review Focus 2
 @pytest.mark.db
 async def test_fonte_invalida(client_fake):  # Review Focus 3
     r = await call(client_fake, "buscar_docs", {"pergunta": "x", "fonte": "python"})
-    assert r.is_error and "mdn, typescript, node" in r.text
+    assert r.is_error and "mdn, typescript, node, vscode" in r.text
 
 
 @pytest.mark.db
@@ -46,8 +46,18 @@ async def test_banco_fora_do_ar(client_sem_banco):  # Review Focus 4
 
 
 async def test_prompts_incluem_regra_do_nivel_4(client_sem_banco):
-    for nome in ["dica", "aula", "exercicio", "revisar", "prova", "entrevista"]:
+    for nome in ["dica", "aula", "exercicio", "revisar", "prova", "entrevista", "processo", "vscode"]:
         assert "nível 4" in await get_prompt(client_sem_banco, nome)
+
+
+async def test_prompt_processo(client_sem_banco):
+    texto = await get_prompt(client_sem_banco, "processo")
+    assert "commit" in texto and "pull request" in texto
+
+
+async def test_prompt_vscode(client_sem_banco):
+    texto = await get_prompt(client_sem_banco, "vscode")
+    assert "destacar_linha" in texto and "buscar_docs" in texto and "recomendar_extensao" in texto
 
 
 class _EmbedderFora:
@@ -94,3 +104,22 @@ async def test_atribuicao_mdn_no_formato_recomendado(client_fake):
     r = await call(client_fake, "buscar_docs", {"pergunta": "Map.prototype.get"})
     a = r.data["atribuicao"]
     assert "Mozilla Contributors" in a and "https://creativecommons.org/licenses/by-sa/2.5/" in a
+
+
+@pytest.mark.db
+async def test_fonte_vscode_aceita_com_atribuicao(client_fake):
+    r = await call(client_fake, "buscar_docs", {"pergunta": "breakpoints logpoints", "fonte": "vscode"})
+    assert not r.is_error
+    assert r.data["trechos"] and {t["fonte"] for t in r.data["trechos"]} == {"vscode"}
+    assert r.data["trechos"][0]["url"].startswith("https://code.visualstudio.com/")
+    a = r.data["atribuicao"]
+    assert "Visual Studio Code" in a and "https://creativecommons.org/licenses/by/3.0/us/" in a
+    assert "Mozilla" not in a
+
+
+@pytest.mark.db
+async def test_atribuicao_mdn_e_vscode_juntas(client_fake):
+    from mentor_server.app import ATRIBUICAO_MDN, ATRIBUICAO_VSCODE, _atribuicao
+
+    assert _atribuicao({"mdn", "vscode"}) == ATRIBUICAO_MDN + " " + ATRIBUICAO_VSCODE
+    assert _atribuicao({"node"}) == ""

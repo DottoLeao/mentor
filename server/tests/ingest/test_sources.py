@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import pytest
+
 from mentor_server.ingest.sources import SOURCES
 
 
-def test_tres_fontes():
-    assert set(SOURCES) == {"mdn", "typescript", "node"}
+def test_quatro_fontes():
+    assert list(SOURCES) == ["mdn", "typescript", "node", "vscode"]
+    assert SOURCES["vscode"].license == "CC-BY-3.0-US"
+    assert SOURCES["vscode"].subdirs == ("docs", "release-notes")
     assert SOURCES["mdn"].license == "CC-BY-SA-2.5"
     assert SOURCES["node"].license == "MIT"
 
@@ -49,3 +53,40 @@ def test_arquivo_sem_url_e_pulado(tmp_path):
 
 def test_licenca_do_typescript_confirmada():
     assert SOURCES["typescript"].license == "CC-BY-4.0"
+
+
+def test_url_vscode_docs():
+    p = Path(".work/sources/vscode/docs/editor/debugging.md")
+    assert SOURCES["vscode"].url_for(p) == "https://code.visualstudio.com/docs/editor/debugging"
+
+
+def test_url_vscode_docs_aninhado():
+    p = Path("/x/vscode/docs/copilot/reference/copilot-settings.md")
+    assert SOURCES["vscode"].url_for(p) == "https://code.visualstudio.com/docs/copilot/reference/copilot-settings"
+
+
+def test_url_vscode_release_notes():
+    p = Path(".work/sources/vscode/release-notes/v1_95.md")
+    assert SOURCES["vscode"].url_for(p) == "https://code.visualstudio.com/updates/v1_95"
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "README.md",
+        "blogs/2024/10/01/post.md",
+        "release-notes/November_2015.md",  # nome antigo sem padrão vX_Y: pular, nunca URL quebrada
+        "release-notes/images/1_95/x.md",
+        "docs/_partials/aviso.md",
+    ],
+)
+def test_url_vscode_fora_do_padrao_e_none(rel):  # Review Focus 5
+    assert SOURCES["vscode"].url_for(Path("/w/vscode") / rel) is None
+
+
+def test_url_vscode_sem_titulo_no_front_matter(tmp_path):  # Review Focus 5
+    d = tmp_path / "vscode/docs/terminal"
+    d.mkdir(parents=True)
+    f = d / "basics.md"
+    f.write_text("---\nContentId: x\n---\nsem título nenhum", "utf-8")
+    assert SOURCES["vscode"].url_for(f) == "https://code.visualstudio.com/docs/terminal/basics"

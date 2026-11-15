@@ -13,10 +13,14 @@ dependencies = [
     "starlette>=0.40",
 ]
 
+[project.optional-dependencies]
+tracing = ["langfuse>=3"]
+
 [project.scripts]
 mentor-index = "mentor_server.cli:index_main"
 mentor-serve = "mentor_server.cli:serve_main"
 mentor-eval-retrieval = "mentor_server.evals.retrieval:main"
+mentor-eval-conversas = "mentor_server.evals.conversas:cli"
 
 [dependency-groups]
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]
