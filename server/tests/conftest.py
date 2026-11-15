@@ -37,10 +37,10 @@ def _indexar_fixtures(conn, embedder, tmp_path, monkeypatch):
     from mentor_server.ingest import indexer
 
     def _fetch(src, workdir):
-        return "fixture-sha", sorted((FIXTURES_DIR / src.name / src.subdir).rglob("*.md"))
+        return "fixture-sha", sorted(f for d in src.subdirs for f in (FIXTURES_DIR / src.name / d).rglob("*.md"))
 
     monkeypatch.setattr(indexer, "fetch_source", _fetch)
-    for nome in ("mdn", "typescript", "node"):
+    for nome in ("mdn", "typescript", "node", "vscode"):
         indexer.index_source(conn, nome, embedder, tmp_path)
     return conn
 

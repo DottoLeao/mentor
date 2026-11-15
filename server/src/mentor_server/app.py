@@ -27,12 +27,25 @@ ATRIBUICAO_MDN = (
     "Trechos da MDN Web Docs by Mozilla Contributors, licença CC-BY-SA 2.5 "
     "(https://creativecommons.org/licenses/by-sa/2.5/). Cada trecho traz o link da página de origem."
 )
+ATRIBUICAO_VSCODE = (
+    "Trechos da documentação do Visual Studio Code (Microsoft), licença CC BY 3.0 US "
+    "(https://creativecommons.org/licenses/by/3.0/us/)."
+)
 ERRO_PERGUNTA = "A pergunta precisa ter entre 1 e 2000 caracteres."
-ERRO_FONTE = "Fonte desconhecida. Use uma destas: mdn, typescript, node."
+ERRO_FONTE = f"Fonte desconhecida. Use uma destas: {', '.join(SOURCES)}."
 ERRO_K = "O número de trechos (k) precisa estar entre 1 e 10."
 ERRO_BANCO = "A busca está indisponível agora. Tente de novo em alguns minutos."
 
 PROMPTS = ["dica", "aula", "exercicio", "revisar", "prova", "entrevista"]
+
+
+def _atribuicao(fontes: set[str]) -> str:
+    partes = []
+    if "mdn" in fontes:
+        partes.append(ATRIBUICAO_MDN)
+    if "vscode" in fontes:
+        partes.append(ATRIBUICAO_VSCODE)
+    return " ".join(partes)
 
 
 class Trecho(BaseModel):
@@ -59,7 +72,7 @@ def build_server(database_url: str, embedder: Embedder, *, limiter=None) -> MCPS
     """`limiter(ctx) -> None` é chamado antes de cada busca e pode levantar ToolError."""
     server = MCPServer("mentor-conhecimento")
 
-    @server.tool(description="Busca trechos da documentação oficial (MDN, TypeScript, Node.js) com citação.")
+    @server.tool(description="Busca trechos da documentação oficial (MDN, TypeScript, Node.js, VS Code) com citação.")
     def buscar_docs(pergunta: str, ctx: Context, fonte: str | None = None, k: int = 5) -> ResultadoBusca:
         pergunta = pergunta.strip()
         if not 1 <= len(pergunta) <= MAX_PERGUNTA:
@@ -88,8 +101,7 @@ def build_server(database_url: str, embedder: Embedder, *, limiter=None) -> MCPS
             )
             for h in hits
         ]
-        tem_mdn = any(t.fonte == "mdn" for t in trechos)
-        return ResultadoBusca(trechos=trechos, atribuicao=ATRIBUICAO_MDN if tem_mdn else "")
+        return ResultadoBusca(trechos=trechos, atribuicao=_atribuicao({t.fonte for t in trechos}))
 
     for nome in PROMPTS:
         texto = _prompt_text(nome)

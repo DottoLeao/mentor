@@ -31,7 +31,7 @@ async def test_pergunta_invalida(client_fake, pergunta):  # Review Focus 2
 @pytest.mark.db
 async def test_fonte_invalida(client_fake):  # Review Focus 3
     r = await call(client_fake, "buscar_docs", {"pergunta": "x", "fonte": "python"})
-    assert r.is_error and "mdn, typescript, node" in r.text
+    assert r.is_error and "mdn, typescript, node, vscode" in r.text
 
 
 @pytest.mark.db
@@ -94,3 +94,22 @@ async def test_atribuicao_mdn_no_formato_recomendado(client_fake):
     r = await call(client_fake, "buscar_docs", {"pergunta": "Map.prototype.get"})
     a = r.data["atribuicao"]
     assert "Mozilla Contributors" in a and "https://creativecommons.org/licenses/by-sa/2.5/" in a
+
+
+@pytest.mark.db
+async def test_fonte_vscode_aceita_com_atribuicao(client_fake):
+    r = await call(client_fake, "buscar_docs", {"pergunta": "breakpoints logpoints", "fonte": "vscode"})
+    assert not r.is_error
+    assert r.data["trechos"] and {t["fonte"] for t in r.data["trechos"]} == {"vscode"}
+    assert r.data["trechos"][0]["url"].startswith("https://code.visualstudio.com/")
+    a = r.data["atribuicao"]
+    assert "Visual Studio Code" in a and "https://creativecommons.org/licenses/by/3.0/us/" in a
+    assert "Mozilla" not in a
+
+
+@pytest.mark.db
+async def test_atribuicao_mdn_e_vscode_juntas(client_fake):
+    from mentor_server.app import ATRIBUICAO_MDN, ATRIBUICAO_VSCODE, _atribuicao
+
+    assert _atribuicao({"mdn", "vscode"}) == ATRIBUICAO_MDN + " " + ATRIBUICAO_VSCODE
+    assert _atribuicao({"node"}) == ""

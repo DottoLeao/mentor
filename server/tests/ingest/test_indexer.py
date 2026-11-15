@@ -11,8 +11,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 def fake_fetch(sha: str):
     def _fetch(src, workdir):
-        base = FIXTURES / src.name / src.subdir
-        return sha, sorted(base.rglob("*.md"))
+        return sha, sorted(f for d in src.subdirs for f in (FIXTURES / src.name / d).rglob("*.md"))
 
     return _fetch
 

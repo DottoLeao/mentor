@@ -11,7 +11,7 @@ from typing import Callable
 class Source:
     name: str
     repo: str
-    subdir: str
+    subdirs: tuple[str, ...]
     license: str
     url_for: Callable[[Path], str | None]
 
@@ -60,16 +60,41 @@ def _node_url(path: Path) -> str | None:
     return f"https://nodejs.org/docs/latest/api/{path.stem}.html"
 
 
+_VSCODE_REPO_DIR = "/vscode/"
+_VSCODE_RELEASE = re.compile(r"^release-notes/(v\d+_\d+(?:_\d+)?)\.md$")
+
+
+def _vscode_url(path: Path) -> str | None:
+    """docs/<a>/<b>.md -> /docs/<a>/<b>; release-notes/vX_Y.md -> /updates/vX_Y; o resto, None."""
+    posix = path.as_posix()
+    i = posix.rfind(_VSCODE_REPO_DIR)
+    if i == -1:
+        return None
+    rel = posix[i + len(_VSCODE_REPO_DIR) :]
+    m = _VSCODE_RELEASE.match(rel)
+    if m:
+        return f"https://code.visualstudio.com/updates/{m.group(1)}"
+    if not rel.startswith("docs/") or not rel.endswith(".md"):
+        return None
+    parts = rel.removesuffix(".md").split("/")
+    if len(parts) < 3 or any(not p or p.startswith(("_", ".")) or p == "images" for p in parts):
+        return None
+    return "https://code.visualstudio.com/" + "/".join(parts)
+
+
 SOURCES: dict[str, Source] = {
-    "mdn": Source("mdn", "https://github.com/mdn/content", "files/en-us/web/javascript", "CC-BY-SA-2.5", _mdn_url),
+    "mdn": Source("mdn", "https://github.com/mdn/content", ("files/en-us/web/javascript",), "CC-BY-SA-2.5", _mdn_url),
     "typescript": Source(
         "typescript",
         "https://github.com/microsoft/TypeScript-Website",
-        "packages/documentation/copy/en/handbook-v2",
+        ("packages/documentation/copy/en/handbook-v2",),
         "CC-BY-4.0",
         _ts_url,
     ),
-    "node": Source("node", "https://github.com/nodejs/node", "doc/api", "MIT", _node_url),
+    "node": Source("node", "https://github.com/nodejs/node", ("doc/api",), "MIT", _node_url),
+    "vscode": Source(
+        "vscode", "https://github.com/microsoft/vscode-docs", ("docs", "release-notes"), "CC-BY-3.0-US", _vscode_url
+    ),
 }
 
 
@@ -86,7 +111,7 @@ def fetch_source(src: Source, workdir: Path) -> tuple[str, list[Path]]:
     else:
         workdir.mkdir(parents=True, exist_ok=True)
         _git("clone", "--depth", "1", "--filter=blob:none", "--sparse", src.repo, str(dest))
-    _git("sparse-checkout", "set", src.subdir, cwd=dest)
+    _git("sparse-checkout", "set", *src.subdirs, cwd=dest)
     sha = _git("rev-parse", "HEAD", cwd=dest)
-    files = sorted((dest / src.subdir).rglob("*.md"))
+    files = sorted(f for d in src.subdirs for f in (dest / d).rglob("*.md"))
     return sha, files
