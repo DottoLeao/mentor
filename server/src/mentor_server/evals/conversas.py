@@ -11,7 +11,7 @@ import os
 import re
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -90,16 +90,32 @@ class Resultado:
     aprovado: bool | None  # None = inconclusivo
     custo_usd: float
     latencia_s: float
+    resposta: str = field(default="", compare=False)  # para listar as falhas conhecidas
 
 
 def carregar_casos(caminho: Path = CASOS) -> list[dict]:
     return [json.loads(linha) for linha in Path(caminho).read_text("utf-8").splitlines() if linha.strip()]
 
 
-def _sistema_do_agente(trechos: list[dict]) -> str:
+_PROMPT_POR_TIPO = {"vscode": "vscode", "extensao": "vscode"}
+
+
+def _extensoes_para(pergunta: str) -> str:
+    from mentor_server.extensoes import AVISO_VAZIO, recomendar
+
+    achadas = recomendar(pergunta)
+    if not achadas:
+        return AVISO_VAZIO
+    return "\n".join(f"- {e.nome} ({e.id}): {e.motivo} {e.url}" for e in achadas)
+
+
+def _sistema_do_agente(caso: dict, pergunta: str, trechos: list[dict]) -> str:
+    """Mesmo prompt que o agente de verdade usaria no modo do caso, mais o que as ferramentas devolvem."""
     from mentor_server.app import _prompt_text
 
-    texto = _prompt_text("dica")
+    texto = _prompt_text(_PROMPT_POR_TIPO.get(caso["tipo"], "dica"))
+    if caso["tipo"] == "extensao":
+        texto += "\n\n## Resultado de recomendar_extensao para a última mensagem\n\n" + _extensoes_para(pergunta)
     if trechos:
         docs = "\n\n".join(f"[{t.get('titulo', '')}]({t.get('url', '')})\n{t.get('trecho', '')}" for t in trechos)
         texto += "\n\n## Resultado de buscar_docs para a última mensagem\n\n" + docs
@@ -138,7 +154,7 @@ def rodar_caso(
     modelo_juiz: str,
 ) -> Resultado:
     inicio, custo_antes = time.monotonic(), _custo(agente, juiz)
-    veredito = None
+    veredito, resposta = None, ""
     ultima = next(m["content"] for m in reversed(caso["mensagens"]) if m["role"] == "user")
     try:
         trechos = (buscar(ultima) or {}).get("trechos", [])
@@ -146,12 +162,16 @@ def rodar_caso(
         trechos = []
     try:
         resposta = agente.completar(
-            [{"role": "system", "content": _sistema_do_agente(trechos)}, *caso["mensagens"]], modelo=modelo_agente
+            [{"role": "system", "content": _sistema_do_agente(caso, ultima, trechos)}, *caso["mensagens"]],
+            modelo=modelo_agente,
         )
         pedido = {
             "tipo": caso["tipo"],
             "conversa": caso["mensagens"],
-            "trechos_disponiveis": [{"url": t.get("url"), "titulo": t.get("titulo")} for t in trechos],
+            "trechos_disponiveis": [
+                {"url": t.get("url"), "titulo": t.get("titulo"), "trecho": (t.get("trecho") or "")[:1500]}
+                for t in trechos
+            ],
             "resposta_do_mentor": resposta,
             "criterios": caso["criterios"],
         }
@@ -175,6 +195,7 @@ def rodar_caso(
         aprovado=v["aprovado"],
         custo_usd=_custo(agente, juiz) - custo_antes,
         latencia_s=time.monotonic() - inicio,
+        resposta=resposta,
     )
 
 

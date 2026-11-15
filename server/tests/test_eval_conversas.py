@@ -177,3 +177,38 @@ def test_conjunto_tem_50_casos_dos_6_tipos():
 
 def test_caminho_padrao_existe():
     assert Path(CASOS).name == "conversas.jsonl"
+
+
+def _caso(tipo, texto):
+    return {"id": f"{tipo}-x", "tipo": tipo, "mensagens": [{"role": "user", "content": texto}], "criterios": ["c"]}
+
+
+def test_caso_vscode_usa_o_prompt_vscode():
+    agente = LLMFalso(["ok"])
+    rodar_caso(_caso("vscode", "como ponho um breakpoint?"), agente, LLMFalso([APROVADO]), lambda q: TRECHO,
+               modelo_agente="a", modelo_juiz="j")
+    sistema = agente.chamadas[0][0][0]["content"]
+    assert "Modo VS Code" in sistema and "nível 4" in sistema
+
+
+def test_caso_extensao_recebe_o_resultado_de_recomendar_extensao():
+    agente = LLMFalso(["ok", "ok"])
+    juiz = LLMFalso([APROVADO, APROVADO])
+    rodar_caso(_caso("extensao", "meu código tem erro de estilo"), agente, juiz, lambda q: TRECHO,
+               modelo_agente="a", modelo_juiz="j")
+    rodar_caso(_caso("extensao", "quero uma extensão de música"), agente, juiz, lambda q: TRECHO,
+               modelo_agente="a", modelo_juiz="j")
+    com, sem = (c[0][0]["content"] for c in agente.chamadas)
+    assert "Modo VS Code" in com and "recomendar_extensao" in com and "dbaeumer.vscode-eslint" in com
+    assert "Nenhuma extensão do catálogo combina com isso" in sem
+
+
+def test_juiz_recebe_o_texto_dos_trechos():
+    _, _, juiz = _rodar(APROVADO)
+    pedido = "\n".join(m["content"] for m in juiz.chamadas[0][0])
+    assert "returns a specified element" in pedido
+
+
+def test_resultado_guarda_a_resposta_do_agente():
+    r, _, _ = _rodar(APROVADO)
+    assert r.resposta == "Boa! O que você acha que o Map guarda? (fonte: MDN)"
