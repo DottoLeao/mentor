@@ -15,6 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from mentor_server.db.connection import connect
 from mentor_server.embed import Embedder
+from mentor_server.extensoes import AVISO_VAZIO, recomendar
 from mentor_server.ingest.sources import SOURCES
 from mentor_server.ratelimit import ERRO_SEM_INSTALACAO, HEADER
 from mentor_server.search import search
@@ -62,6 +63,19 @@ class ResultadoBusca(BaseModel):
     atribuicao: str
 
 
+class ExtensaoRecomendada(BaseModel):
+    id: str
+    nome: str
+    publicador: str
+    motivo: str
+    url: str
+
+
+class ResultadoExtensoes(BaseModel):
+    extensoes: list[ExtensaoRecomendada]
+    aviso: str
+
+
 def _prompt_text(nome: str) -> str:
     pkg = resources.files("mentor_server.prompts")
     regras = pkg.joinpath("regras.md").read_text("utf-8")
@@ -102,6 +116,22 @@ def build_server(database_url: str, embedder: Embedder, *, limiter=None) -> MCPS
             for h in hits
         ]
         return ResultadoBusca(trechos=trechos, atribuicao=_atribuicao({t.fonte for t in trechos}))
+
+    @server.tool(
+        description=(
+            "Recomenda até 3 extensões do VS Code de um catálogo curado (publicador verificado), "
+            "sempre com o motivo. Descreva o contexto em poucas palavras, sem código nem dado pessoal."
+        )
+    )
+    def recomendar_extensao(contexto: str, ja_instaladas: list[str] | None = None) -> ResultadoExtensoes:
+        achadas = recomendar(contexto[:MAX_PERGUNTA], ja_instaladas or [])
+        return ResultadoExtensoes(
+            extensoes=[
+                ExtensaoRecomendada(id=e.id, nome=e.nome, publicador=e.publicador, motivo=e.motivo, url=e.url)
+                for e in achadas
+            ],
+            aviso="" if achadas else AVISO_VAZIO,
+        )
 
     for nome in PROMPTS:
         texto = _prompt_text(nome)
